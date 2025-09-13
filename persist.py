@@ -57,18 +57,26 @@ def get_refusal_instructions():
     test = train_test["test"]
     return train, test
 
+#VICUNA TEMPLATE
+'''CHAT_TEMPLATE = """A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions. \n
+    USER: {user}
+    ASSISTANT: """ '''
+
+#LLAMA3 CHAT TEMPLATE
+CHAT_TEMPLATE_= """<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n{user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>""" # llama-3 chat template
+
 
 #llama-2-hf-chat 
-CHAT_TEMPLATE = ("<s>[INST] {user} [/INST]")
+#CHAT_TEMPLATE = ("<s>[INST] {user} [/INST]")
 
 #MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct" 
-#MODEL_ID =  "lmsys/vicuna-7b-v1.3"  
+MODEL_ID =  "lmsys/vicuna-7b-v1.3"  
 MODEL_ID= "meta-llama/Llama-2-7b-chat-hf"
 
 #git clone https://huggingface.co/{MODEL_ID} {MODEL_TYPE}
 model = HookedTransformer.from_pretrained_no_processing(
     MODEL_ID,
-    #local_files_only=True,
+    local_files_only=True,
     dtype=torch.bfloat16,   
     default_padding_side='left'
 )

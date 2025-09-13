@@ -10,14 +10,22 @@ from transformers import AutoTokenizer
 from transformer_lens import HookedTransformer, utils
 from typing import List, Tuple
 
+#MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct" 
+#MODEL_ID =  "lmsys/vicuna-7b-v1.3"  
 MODEL_ID = "meta-llama/Llama-2-7b-chat-hf"  
-JSONL_PATH = "suffix.jsonl"                
+JSONL_PATH = "v_suffix.jsonl"                
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DTYPE = torch.bfloat16 if torch.cuda.is_available() else torch.float32
 MAX_PAIRS = 50   
 SEED = 42
 
-CHAT_TEMPLATE = "<s>[INST] {user} [/INST]"
+#VICUNA TEMPLATE
+CHAT_TEMPLATE = """A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions. \n
+    USER: {user}
+    ASSISTANT: """ 
+
+
+#CHAT_TEMPLATE = "<s>[INST] {user} [/INST]"
 
 # Tokens sets for refusal vs affirmation (first next-token)
 REFUSAL_STARTS = ["Sorry", "I", "cannot", "can’t", "I'm", "cannot"]
@@ -29,6 +37,7 @@ torch.set_grad_enabled(False)
 print("Loading model...")
 model = HookedTransformer.from_pretrained_no_processing(
     MODEL_ID,
+    local_files_only=True,
     dtype=DTYPE,
     default_padding_side='left',
     device=DEVICE
@@ -46,9 +55,7 @@ refusal_ids = [tid for t in REFUSAL_STARTS if (tid := first_subtoken_id(t)) is n
 affirm_ids  = [tid for t in AFFIRM_STARTS  if (tid := first_subtoken_id(t)) is not None]
 assert len(refusal_ids) and len(affirm_ids), "Could not map refusal/affirm starts to token IDs."
 
-# -----------------------
-# Data loading
-# -----------------------
+
 print(f"Loading dataset from {JSONL_PATH} ...")
 dataset = load_dataset("json", data_files=JSONL_PATH)
 data = [dict(q=row["q"], p=row["p"]) for row in dataset["train"]]
@@ -57,9 +64,6 @@ if MAX_PAIRS:
     data = data[:MAX_PAIRS]
 assert len(data) > 0, "No data found."
 
-# -----------------------
-# Helpers
-# -----------------------
 def format_user_turn(text: str) -> str:
     """Put the full user message inside the SAME [INST] ... [/INST] block."""
     return CHAT_TEMPLATE.format(user=text)
@@ -100,9 +104,6 @@ def run_with_cache_single(text: str):
     )
     return toks, logits, cache
 
-# -----------------------
-# PROBE 1: First-token Δ margin histogram
-# -----------------------
 print("\n[PROBE 1] Measuring first-token effect of suffix (Δ margin = with - without)")
 deltas = []
 examples = []
@@ -293,7 +294,7 @@ for d in summary[:TOP]:
 
 # Save CSVs
 import csv
-with open("per_head_effects_summary.csv", "w", newline="") as f:
+with open("per_head_effects_summary_1.csv", "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["layer", "head", "n", "mean_effect", "mean_abs_effect", "std_effect"])
     for d in summary:
@@ -306,7 +307,7 @@ with open("pair_level_deltas.csv", "w", newline="") as f:
     w.writerow(["pair_idx", "margin_no_suffix", "margin_with_suffix", "delta"])
     for (idx, m0, m1, d) in pair_summaries:
         w.writerow([idx, f"{m0:.6f}", f"{m1:.6f}", f"{d:.6f}"])
-print("Saved: pair_level_deltas.csv")
+print("Saved: pair_level_deltas_1.csv")
 
 # Optional: attention targets for the #1 head on one representative pair
 best = summary[0]
